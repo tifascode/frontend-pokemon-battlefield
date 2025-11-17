@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Press Start 2P', cursive;
+  background-color: #202020;
+  color: white;
+  overflow: hidden; /* Remove barras de rolagem */
+}
+
+#root {
+  width: 100vw;   /* Largura total da visão */
+  height: 100vh;  /* Altura total da visão */
+  max-width: none; /* Remove o limite de 800px anterior */
+  border: none;    /* Remove a borda cinza */
+  box-shadow: none;
+  background-color: #f8f9fa; /* Fundo claro dentro do jogo */
+  color: black;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Regra de Ouro para Pixel Art: Mantém os pixels quadrados ao dar zoom */
+img {
+  image-rendering: pixelated; 
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+/* Botão Gigante */
+.btn-pixel {
+  font-family: 'Press Start 2P', cursive;
+  background: #fff;
+  border: 6px solid #333; /* Borda mais grossa */
+  padding: 25px 50px;     /* Mais espaçamento */
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 24px;        /* Fonte maior */
+  box-shadow: 8px 8px 0px #333; /* Sombra maior */
+  transition: transform 0.1s;
+}
+
+.btn-pixel:active {
+  transform: translate(8px, 8px);
+  box-shadow: none;
+}
+
+/* Classe utilitária para container centralizado */
+.full-screen-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
