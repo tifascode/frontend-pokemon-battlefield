@@ -75,7 +75,7 @@ const Lobby = () => {
 
       {/* COLUNA DA DIREITA: Setup da Batalha */}
       <div style={styles.vsContainer}>
-        <h1 style={{fontSize: '40px', marginBottom: '40px'}}>VS MODE</h1>
+        <h1 style={{fontSize: '40px', marginBottom: '40px', color: '#DC0A2D'}}>VS MODE</h1>
 
         <div style={styles.selectors}>
           {/* PLAYER 1 */}

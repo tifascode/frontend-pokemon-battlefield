@@ -1,32 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { listarTreinadores } from '../services/treinadorService';
-import pokeApi from '../services/pokeApi'; // Importando a API oficial
-import axios from 'axios'; // Para buscar os detalhes de cada golpe
+import pokeApi from '../services/pokeApi';
+import axios from 'axios';
+import battleBg from '../assets/battle_bg.png'; // Sua imagem de fundo
 
 const Batalha = () => {
   const { player1Id, player2Id } = useParams();
   const navigate = useNavigate();
 
-  // --- ESTADOS GERAIS ---
+  // --- ESTADOS ---
   const [loading, setLoading] = useState(true);
   const [p1, setP1] = useState(null);
   const [p2, setP2] = useState(null);
   
   const [activeP1Index, setActiveP1Index] = useState(0);
   const [activeP2Index, setActiveP2Index] = useState(0);
+  
   const [hpP1, setHpP1] = useState(100);
   const [hpP2, setHpP2] = useState(100);
 
-  // --- ESTADOS DE BATALHA ---
-  const [dialogo, setDialogo] = useState("Carregando dados da batalha...");
+  const [dialogo, setDialogo] = useState("Preparando a arena...");
   const [turno, setTurno] = useState('p1'); 
-  const [menuFase, setMenuFase] = useState('principal'); // 'principal' ou 'ataques'
-  
-  // Guardar os golpes carregados da API
-  const [golpesP1, setGolpesP1] = useState([]);
+  const [menuFase, setMenuFase] = useState('principal'); 
+  const [golpesP1, setGolpesP1] = useState([]); 
 
-  // --- SETUP INICIAL ---
+  // --- INICIALIZAÇÃO ---
   useEffect(() => {
     const inicializarBatalha = async () => {
       try {
@@ -42,93 +41,142 @@ const Batalha = () => {
         setHpP1(100);
         setHpP2(100);
 
-        // --- A MÁGICA ACONTECE AQUI ---
-        // Buscamos os golpes do Pokémon atual do Player 1 na PokéAPI
-        const pokemonAtivoNome = t1.pokemons[0].nome; // Pega o nome (ex: "charmander")
-        await carregarGolpes(pokemonAtivoNome);
+        // Carrega golpes do primeiro pokemon
+        if (t1.pokemons.length > 0) {
+            await carregarGolpes(t1.pokemons[0].nome);
+        }
 
         setDialogo(`Batalha iniciada! ${t1.nome} vs ${t2.nome}`);
         setLoading(false);
       } catch (erro) {
         console.error(erro);
-        alert("Erro ao iniciar batalha");
         navigate('/lobby');
       }
     };
-
     inicializarBatalha();
   }, [player1Id, player2Id]);
 
-  // Função auxiliar para buscar 4 golpes reais
+  // --- CARREGAR GOLPES ---
   const carregarGolpes = async (pokemonNome) => {
     try {
-      // 1. Busca dados gerais do pokemon
+      setDialogo(`Analisando ${pokemonNome}...`);
       const resp = await pokeApi.get(`/pokemon/${pokemonNome.toLowerCase()}`);
-      
-      // 2. Pega os 4 primeiros golpes da lista
       const primeirosGolpes = resp.data.moves.slice(0, 4);
 
-      // 3. Busca os detalhes de cada golpe (Power, Type) em paralelo
       const promessasDetalhadas = primeirosGolpes.map(async (m) => {
         const detalheResp = await axios.get(m.move.url);
         return {
-            nome: m.move.name.replace('-', ' '), // Tira os hífens (ex: thunder-shock)
-            poder: detalheResp.data.power || 10, // Se for golpe de status (null), põe dano 10
+            nome: m.move.name.replace('-', ' '),
+            poder: detalheResp.data.power || 15,
             tipo: detalheResp.data.type.name
         };
       });
 
       const golpesProntos = await Promise.all(promessasDetalhadas);
       setGolpesP1(golpesProntos);
-
+      setDialogo("Sua vez!");
     } catch (error) {
-        console.log("Erro ao carregar golpes", error);
-        // Fallback se der erro na API
-        setGolpesP1([{ nome: "Tackle", poder: 20 }, { nome: "Scratch", poder: 20 }]);
+        setGolpesP1([{ nome: "Tackle", poder: 20, tipo: "normal" }]);
     }
   };
 
-  // --- AÇÃO DE ATAQUE ---
+  // --- LÓGICA: ATAQUE DO JOGADOR ---
   const handleUsarGolpe = (golpe) => {
-    setMenuFase('principal'); // Esconde o menu de golpes
+    setMenuFase('principal'); 
     
-    // 1. Calcula Dano (Baseado no Poder do golpe + aleatoriedade)
-    const fatorAleatorio = (Math.floor(Math.random() * 15) + 85) / 100; // Entre 0.85 e 1.0
-    const danoFinal = Math.floor(golpe.poder * 0.5 * fatorAleatorio); // Fórmula simplificada
+    const fatorSorte = (Math.floor(Math.random() * 15) + 85) / 100; 
+    const danoFinal = Math.floor(golpe.poder * 0.5 * fatorSorte); 
     
     setDialogo(`${p1.pokemons[activeP1Index].nome} usou ${golpe.nome.toUpperCase()}!`);
 
-    // 2. Animação e Dano
+    // 1. Aplica o dano
     setTimeout(() => {
-      setHpP2(prev => Math.max(0, prev - danoFinal));
-      
-      if (hpP2 - danoFinal <= 0) {
-        setDialogo(`${p2.pokemons[activeP2Index].nome} desmaiou! Vitória!`);
-        return;
-      }
+      const novoHpInimigo = Math.max(0, hpP2 - danoFinal);
+      setHpP2(novoHpInimigo);
 
-      // Passa a vez
-      setTurno('p2');
-      setTimeout(contraAtaqueInimigo, 2000);
+      // 2. Verifica se matou
+      if (novoHpInimigo <= 0) {
+        verificarVitoriaOuTroca();
+      } else {
+        // Se não matou, passa a vez
+        setTurno('p2');
+        setTimeout(contraAtaqueInimigo, 2000);
+      }
     }, 1000);
   };
 
+  // --- LÓGICA: INIMIGO DESMAIOU? ---
+  const verificarVitoriaOuTroca = () => {
+    const pokemonMorto = p2.pokemons[activeP2Index].nome;
+    setDialogo(`${pokemonMorto} desmaiou!`);
+
+    setTimeout(() => {
+      const proximoIndex = activeP2Index + 1;
+      
+      // Tem mais pokemons?
+      if (proximoIndex < p2.pokemons.length) {
+        // TROCA DE POKEMON INIMIGO
+        setActiveP2Index(proximoIndex);
+        setHpP2(100); // Vida cheia para o novo
+        const novoPoke = p2.pokemons[proximoIndex].nome;
+        setDialogo(`${p2.nome} enviou ${novoPoke}!`);
+        
+        // Volta a vez para o player atacar o novo pokemon
+        setTurno('p1'); 
+      } else {
+        // VITÓRIA FINAL
+        setDialogo(`Vitória! ${p1.nome} venceu a batalha!`);
+        setTimeout(() => navigate('/lobby'), 4000);
+      }
+    }, 2000);
+  };
+
+  // --- LÓGICA: ATAQUE DO INIMIGO ---
   const contraAtaqueInimigo = () => {
-    const dano = Math.floor(Math.random() * 20) + 10; // Inimigo ainda aleatório
+    const danoInimigo = Math.floor(Math.random() * 25) + 10; 
     setDialogo(`${p2.pokemons[activeP2Index].nome} inimigo atacou!`);
 
     setTimeout(() => {
-      setHpP1(prev => Math.max(0, prev - dano));
-      if (hpP1 - dano <= 0) {
-         setDialogo(`Seu pokemon desmaiou...`);
-         return;
+      const novoHpPlayer = Math.max(0, hpP1 - danoInimigo);
+      setHpP1(novoHpPlayer);
+      
+      if (novoHpPlayer <= 0) {
+         verificarDerrotaOuTroca();
+      } else {
+         setTurno('p1');
+         setDialogo(`O que ${p1.pokemons[activeP1Index].nome} vai fazer?`);
       }
-      setTurno('p1');
-      setDialogo(`O que ${p1.pokemons[activeP1Index].nome} vai fazer?`);
     }, 1000);
   };
 
-  if (loading) return <div className="full-screen-center">CARREGANDO GOLPES...</div>;
+  // --- LÓGICA: JOGADOR DESMAIOU? ---
+  const verificarDerrotaOuTroca = () => {
+    const pokemonMorto = p1.pokemons[activeP1Index].nome;
+    setDialogo(`${pokemonMorto} desmaiou...`);
+
+    setTimeout(() => {
+      const proximoIndex = activeP1Index + 1;
+
+      if (proximoIndex < p1.pokemons.length) {
+        // TROCA DE POKEMON PLAYER
+        const novoPoke = p1.pokemons[proximoIndex].nome;
+        setActiveP1Index(proximoIndex);
+        setHpP1(100);
+        setDialogo(`Vai, ${novoPoke}!`);
+        
+        // Importante: Carregar os golpes do novo pokemon!
+        carregarGolpes(novoPoke);
+        
+        setTurno('p1'); // Player começa atacando com o novo
+      } else {
+        // DERROTA FINAL
+        setDialogo(`Você perdeu... Tente novamente.`);
+        setTimeout(() => navigate('/lobby'), 4000);
+      }
+    }, 2000);
+  };
+
+  if (loading) return <div className="full-screen-center" style={{backgroundColor:'#000', color:'white'}}>CARREGANDO...</div>;
 
   const activeP1 = p1.pokemons[activeP1Index];
   const activeP2 = p2.pokemons[activeP2Index];
@@ -136,6 +184,7 @@ const Batalha = () => {
 
   return (
     <div style={styles.arena}>
+      
       {/* HUD INIMIGO */}
       <div style={styles.enemyArea}>
         <div style={styles.hudBox}>
@@ -147,7 +196,7 @@ const Batalha = () => {
         <img src={activeP2.sprite} alt="Enemy" style={styles.enemySprite} />
       </div>
 
-      {/* HUD JOGADOR */}
+      {/* HUD PLAYER */}
       <div style={styles.playerArea}>
         <img src={backSpriteUrl} alt="Hero" style={styles.heroSprite} />
         <div style={styles.hudBox}>
@@ -159,37 +208,30 @@ const Batalha = () => {
         </div>
       </div>
 
-      {/* MENU INTERATIVO */}
+      {/* MENU */}
       <div style={styles.menuArea}>
         <div style={styles.dialogBox}>
           <p>{dialogo}</p>
         </div>
         
-        {/* CONDIÇÃO DE EXIBIÇÃO DOS MENUS */}
         {turno === 'p1' && hpP1 > 0 && hpP2 > 0 && (
             <>
                 {menuFase === 'principal' ? (
-                    // MENU PRINCIPAL (Lutar/Mochila/etc)
                     <div style={styles.actionsBox}>
                         <button className="btn-action" onClick={() => setMenuFase('ataques')}>LUTAR</button>
-                        <button className="btn-action" disabled style={{color:'#aaa'}}>POKÉMON</button>
-                        <button className="btn-action" disabled style={{color:'#aaa'}}>MOCHILA</button>
+                        <button className="btn-action" style={{color:'#aaa'}}>POKÉMON</button>
+                        <button className="btn-action" style={{color:'#aaa'}}>MOCHILA</button>
                         <button className="btn-action" onClick={() => navigate('/lobby')}>FUGIR</button>
                     </div>
                 ) : (
-                    // SUB-MENU DE GOLPES (Os 4 ataques)
                     <div style={styles.movesGrid}>
                         {golpesP1.map((golpe, idx) => (
                             <button key={idx} className="btn-move" onClick={() => handleUsarGolpe(golpe)}>
-                                {golpe.nome} <span style={{fontSize:'8px'}}>{golpe.tipo}</span>
+                                {golpe.nome} 
+                                <span style={{fontSize:'8px', marginTop:'4px', color:'#555'}}>{golpe.tipo}</span>
                             </button>
                         ))}
-                        <button 
-                            style={{...styles.btnMove, backgroundColor: '#eee', color: '#000'}} 
-                            onClick={() => setMenuFase('principal')}
-                        >
-                            VOLTAR
-                        </button>
+                        <button style={{...styles.btnMove, backgroundColor: '#ddd'}} onClick={() => setMenuFase('principal')}>VOLTAR</button>
                     </div>
                 )}
             </>
@@ -206,25 +248,37 @@ const getHpColor = (hp) => {
 }
 
 const styles = {
-  // ... (Mantenha os estilos anteriores: arena, enemyArea, playerArea, sprites, hudBox, hpBar, etc)
-  arena: { width: '100vw', height: '100vh', backgroundColor: '#f8f9fa', backgroundImage: 'linear-gradient(to bottom, #85C1E9 0%, #85C1E9 40%, #58D68D 40%, #58D68D 100%)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
-  enemyArea: { position: 'absolute', top: '50px', right: '50px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' },
-  playerArea: { position: 'absolute', bottom: '180px', left: '50px', display: 'flex', alignItems: 'flex-end' },
-  enemySprite: { width: '200px', height: '200px', marginTop: '-30px', animation: 'float 3s ease-in-out infinite' },
-  heroSprite: { width: '250px', height: '250px', marginRight: '30px' },
-  hudBox: { backgroundColor: '#f8f8d8', border: '4px solid #333', padding: '10px 20px', borderRadius: '10px 0 10px 0', boxShadow: '5px 5px 0px rgba(0,0,0,0.2)', width: '250px' },
-  nameText: { display: 'block', marginBottom: '5px', textTransform: 'uppercase', fontSize: '14px' },
-  hpContainer: { width: '100%', height: '10px', backgroundColor: '#ccc', borderRadius: '5px', border: '2px solid #333', overflow: 'hidden' },
-  hpBar: { height: '100%', transition: 'width 0.5s ease-out' },
-  hpText: { fontSize: '10px', marginTop: '5px', display: 'block', textAlign: 'right' },
+  arena: {
+    width: '100vw',
+    height: '100vh',
+    position: 'relative',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: 'black', 
+    backgroundImage: `url(${battleBg})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center bottom',
+    backgroundRepeat: 'no-repeat',
+    imageRendering: 'pixelated'
+  },
+  enemyArea: { position: 'absolute', top: '120px', right: '60px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' },
+  playerArea: { position: 'absolute', bottom: '180px', left: '60px', display: 'flex', alignItems: 'flex-end' },
   
-  // ESTILOS DO MENU ATUALIZADOS
-  menuArea: { position: 'absolute', bottom: 0, width: '100%', height: '150px', backgroundColor: '#2a2a2a', borderTop: '6px solid #FFDE00', display: 'flex', padding: '10px' },
-  dialogBox: { flex: 2, backgroundColor: '#333', border: '4px solid #fff', borderRadius: '5px', padding: '20px', marginRight: '10px', color: 'white', fontSize: '18px', lineHeight: '1.5' },
-  actionsBox: { flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', backgroundColor: '#fff', border: '4px solid #333', padding: '5px' },
-  
-  // NOVO: Grid para os golpes
-  movesGrid: { flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', backgroundColor: '#222', border: '4px solid #DC0A2D', padding: '5px' },
+  // Sprites grandes
+  enemySprite: { width: '280px', height: '280px', marginTop: '-20px', marginRight: '40px', animation: 'float 3s ease-in-out infinite', filter: 'drop-shadow(5px 10px 10px rgba(0,0,0,0.5))' },
+  heroSprite: { width: '380px', height: '380px', marginBottom: '-20px', marginLeft: '40px', filter: 'drop-shadow(5px 10px 10px rgba(0,0,0,0.5))' },
+
+  hudBox: { backgroundColor: '#f8f8d8', border: '4px solid #333', padding: '10px 20px', borderRadius: '10px 0 10px 0', boxShadow: '6px 6px 0px rgba(0,0,0,0.3)', width: '280px', zIndex: 5 },
+  nameText: { display: 'block', marginBottom: '8px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '16px', color: '#000' },
+  hpContainer: { width: '100%', height: '12px', backgroundColor: '#555', borderRadius: '6px', border: '2px solid #222', overflow: 'hidden' },
+  hpBar: { height: '100%', transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)' },
+  hpText: { fontSize: '12px', marginTop: '5px', display: 'block', textAlign: 'right', color: '#333' },
+  menuArea: { position: 'absolute', bottom: 0, width: '100%', height: '160px', backgroundColor: '#2a2a2a', borderTop: '6px solid #FFDE00', display: 'flex', padding: '15px', boxShadow: '0 -5px 20px rgba(0,0,0,0.5)' },
+  dialogBox: { flex: 2, backgroundColor: 'rgba(0, 0, 0, 0.8)', border: '4px solid #fff', borderRadius: '8px', padding: '25px', marginRight: '15px', color: 'white', fontSize: '20px', lineHeight: '1.5', textShadow: '2px 2px 0 #000' },
+  actionsBox: { flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#fff', border: '4px solid #333', padding: '8px', borderRadius: '4px' },
+  movesGrid: { flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', backgroundColor: '#222', border: '4px solid #DC0A2D', padding: '8px', borderRadius: '4px' },
+  btnMove: { display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', fontFamily: '"Press Start 2P", cursive', fontSize: '10px', backgroundColor: '#f0f0f0', border: '2px solid #555' }
 };
 
 export default Batalha;
