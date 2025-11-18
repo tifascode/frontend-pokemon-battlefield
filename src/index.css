@@ -59,3 +59,26 @@ img {
   height: 100%;
   width: 100%;
 }
+
+/* Botão de Ação na Batalha */
+.btn-action {
+  font-family: 'Press Start 2P', cursive;
+  background: white;
+  border: 2px solid #333;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 12px;
+  transition: background 0.1s;
+}
+
+.btn-action:hover {
+  background-color: #f0f0f0;
+  color: #DC0A2D; /* Vermelho ao passar o mouse */
+}
+
+/* Animação simples de flutuar para o Pokemon Inimigo */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
