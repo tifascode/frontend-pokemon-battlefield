@@ -14,34 +14,35 @@ body {
 }
 
 #root {
-  width: 100vw;   /* Largura total da visão */
-  height: 100vh;  /* Altura total da visão */
-  max-width: none; /* Remove o limite de 800px anterior */
-  border: none;    /* Remove a borda cinza */
+  width: 100vw;   
+  height: 100vh;  
+  max-width: none;
+  border: none;
   box-shadow: none;
-  background-color: #f8f9fa; /* Fundo claro dentro do jogo */
+  background-color: #f8f9fa;
   color: black;
   display: flex;
   flex-direction: column;
 }
 
-/* Regra de Ouro para Pixel Art: Mantém os pixels quadrados ao dar zoom */
+/* Regra de Ouro para Pixel Art */
 img {
   image-rendering: pixelated; 
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
 }
 
-/* Botão Gigante */
+/* --- BOTÕES E UI --- */
+
 .btn-pixel {
   font-family: 'Press Start 2P', cursive;
   background: #fff;
-  border: 6px solid #333; /* Borda mais grossa */
-  padding: 25px 50px;     /* Mais espaçamento */
+  border: 6px solid #333; 
+  padding: 25px 50px;     
   cursor: pointer;
   text-transform: uppercase;
-  font-size: 24px;        /* Fonte maior */
-  box-shadow: 8px 8px 0px #333; /* Sombra maior */
+  font-size: 24px;        
+  box-shadow: 8px 8px 0px #333; 
   transition: transform 0.1s;
 }
 
@@ -50,7 +51,6 @@ img {
   box-shadow: none;
 }
 
-/* Classe utilitária para container centralizado */
 .full-screen-center {
   display: flex;
   flex-direction: column;
@@ -60,7 +60,6 @@ img {
   width: 100%;
 }
 
-/* Botão de Ação na Batalha */
 .btn-action {
   font-family: 'Press Start 2P', cursive;
   background: white;
@@ -73,17 +72,9 @@ img {
 
 .btn-action:hover {
   background-color: #f0f0f0;
-  color: #DC0A2D; /* Vermelho ao passar o mouse */
+  color: #DC0A2D; 
 }
 
-/* Animação simples de flutuar para o Pokemon Inimigo */
-@keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0px); }
-}
-
-/* Botão específico de Golpe */
 .btn-move {
   font-family: 'Press Start 2P', cursive;
   background: #f8f8f8;
@@ -100,11 +91,82 @@ img {
 }
 
 .btn-move:hover {
-  background-color: #ffe5b4; /* Um laranja claro */
+  background-color: #ffe5b4; 
   border-color: #d35400;
   transform: scale(1.02);
 }
 
 .btn-move:active {
   background-color: #aaa;
+}
+
+/* --- ANIMAÇÕES DE BATALHA --- */
+
+/* Classe para o Pokemon Inimigo flutuar (IDLE) */
+.idle-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+/* Ataque como um "Raio de Energia" */
+.attack-ray {
+  position: absolute;
+  width: 50px; 
+  height: 20px; 
+  border-radius: 10px;
+  filter: blur(2px); 
+  z-index: 10;
+  box-shadow: 0 0 15px currentColor; 
+}
+
+/* Raio do Jogador */
+.player-attack-ray {
+  animation: playerAttackRayMove 0.8s forwards cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes playerAttackRayMove {
+  0% { transform: translate(0, 0) scale(0.5); opacity: 0.8; }
+  50% { transform: translate(250px, -100px) scale(1.2); opacity: 1; } 
+  100% { transform: translate(500px, -220px) scale(0.8); opacity: 0; } 
+}
+
+/* Raio do Inimigo */
+.enemy-attack-ray {
+  animation: enemyAttackRayMove 0.8s forwards cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes enemyAttackRayMove {
+  0% { transform: translate(0, 0) scale(0.5); opacity: 0.8; }
+  50% { transform: translate(-250px, 100px) scale(1.2); opacity: 1; }
+  100% { transform: translate(-500px, 220px) scale(0.8); opacity: 0; } 
+}
+
+/* --- EFEITOS DE DANO (IMPORTANTE: TEM !important PARA SOBRESCREVER O FLUTUAR) --- */
+
+/* Treme quando toma dano */
+.damaged-animation {
+  animation: damagedShake 0.3s ease-in-out !important;
+}
+
+@keyframes damagedShake {
+  0%, 100% { transform: translateX(0); opacity: 1; }
+  25% { transform: translateX(-5px) translateY(-2px); opacity: 0.8; }
+  50% { transform: translateX(5px) translateY(2px); opacity: 0.6; }
+  75% { transform: translateX(-5px) translateY(-2px); opacity: 0.8; }
+}
+
+/* Flash Branco quando toma dano */
+.flash-animation {
+  animation: flashWhite 0.3s ease-out !important;
+}
+
+@keyframes flashWhite {
+  0% { filter: brightness(1) contrast(1) drop-shadow(5px 10px 10px rgba(0,0,0,0.5)); }
+  50% { filter: brightness(3) contrast(2) drop-shadow(5px 10px 10px rgba(0,0,0,0.5)); } 
+  100% { filter: brightness(1) contrast(1) drop-shadow(5px 10px 10px rgba(0,0,0,0.5)); }
 }
