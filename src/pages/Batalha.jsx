@@ -9,18 +9,24 @@ const Batalha = () => {
   const { player1Id, player2Id } = useParams();
   const navigate = useNavigate();
 
+  // --- ESTADOS ---
   const [loading, setLoading] = useState(true);
   const [p1, setP1] = useState(null);
   const [p2, setP2] = useState(null);
+  
   const [activeP1Index, setActiveP1Index] = useState(0);
   const [activeP2Index, setActiveP2Index] = useState(0);
+  
+  // HP Visual (Barras)
   const [hpP1, setHpP1] = useState(100);
   const [hpP2, setHpP2] = useState(100);
+
   const [dialogo, setDialogo] = useState("Preparando a arena...");
   const [turno, setTurno] = useState('p1'); 
   const [menuFase, setMenuFase] = useState('principal'); 
   const [golpesP1, setGolpesP1] = useState([]); 
 
+  // --- ESTADOS DE ANIMAÇÃO ---
   const [showPlayerAttack, setShowPlayerAttack] = useState(false);
   const [showEnemyAttack, setShowEnemyAttack] = useState(false);
   const [playerDamaged, setPlayerDamaged] = useState(false);
@@ -28,6 +34,7 @@ const Batalha = () => {
   const [playerFlash, setPlayerFlash] = useState(false); 
   const [enemyFlash, setEnemyFlash] = useState(false);   
 
+  // --- INICIALIZAÇÃO ---
   useEffect(() => {
     const inicializarBatalha = async () => {
       try {
@@ -38,14 +45,22 @@ const Batalha = () => {
 
         if (!t1 || !t2) { throw new Error("Treinadores não encontrados"); }
 
+        // CORREÇÃO 1: Inicializar HP de todos os pokemons
+        // Adicionamos a propriedade .hpAtual para cada um
+        t1.pokemons = t1.pokemons.map(p => ({ ...p, hpAtual: 100 }));
+        t2.pokemons = t2.pokemons.map(p => ({ ...p, hpAtual: 100 }));
+
         setP1(t1);
         setP2(t2);
+        
+        // Define HP visual inicial
         setHpP1(100);
         setHpP2(100);
 
         if (t1.pokemons.length > 0) {
             await carregarGolpes(t1.pokemons[0].nome);
         }
+
         setDialogo(`Batalha iniciada! ${t1.nome} vs ${t2.nome}`);
         setLoading(false);
       } catch (erro) {
@@ -56,11 +71,39 @@ const Batalha = () => {
     inicializarBatalha();
   }, [player1Id, player2Id]);
 
+  // --- HELPER: ATUALIZAR HP REAL ---
+  // Essa função garante que o objeto P1 seja atualizado, não só a barra visual
+  const aplicarDanoP1 = (dano) => {
+    const novoHp = Math.max(0, hpP1 - dano);
+    setHpP1(novoHp);
+    
+    // Atualiza o objeto profundo
+    const novoP1 = { ...p1 };
+    novoP1.pokemons[activeP1Index].hpAtual = novoHp;
+    setP1(novoP1);
+    
+    return novoHp;
+  };
+
+  const aplicarDanoP2 = (dano) => {
+    const novoHp = Math.max(0, hpP2 - dano);
+    setHpP2(novoHp);
+    
+    // Atualiza o objeto profundo
+    const novoP2 = { ...p2 };
+    novoP2.pokemons[activeP2Index].hpAtual = novoHp;
+    setP2(novoP2);
+    
+    return novoHp;
+  };
+
+  // --- CARREGAR GOLPES ---
   const carregarGolpes = async (pokemonNome) => {
     try {
       setDialogo(`Preparando ${pokemonNome}...`);
       const resp = await pokeApi.get(`/pokemon/${pokemonNome.toLowerCase()}`);
       const primeirosGolpes = resp.data.moves.slice(0, 4);
+
       const promessasDetalhadas = primeirosGolpes.map(async (m) => {
         const detalheResp = await axios.get(m.move.url);
         return {
@@ -69,6 +112,7 @@ const Batalha = () => {
             tipo: detalheResp.data.type.name
         };
       });
+
       const golpesProntos = await Promise.all(promessasDetalhadas);
       setGolpesP1(golpesProntos);
       setDialogo("Sua vez!");
@@ -77,20 +121,34 @@ const Batalha = () => {
     }
   };
 
+  // --- AÇÃO: TROCAR POKÉMON ---
   const handleTrocarPokemon = (novoIndex) => {
-    const novoPoke = p1.pokemons[novoIndex].nome;
-    setDialogo(`Vai, ${novoPoke}!`);
+    const novoPokeObj = p1.pokemons[novoIndex];
+    
+    // CORREÇÃO 2: Verificar se o pokemon alvo está vivo antes de trocar (segurança extra)
+    if (novoPokeObj.hpAtual <= 0) {
+        setDialogo(`${novoPokeObj.nome} está desmaiado!`);
+        return;
+    }
+
+    setDialogo(`Vai, ${novoPokeObj.nome}!`);
     setActiveP1Index(novoIndex);
-    setHpP1(100); 
-    carregarGolpes(novoPoke);
+    
+    // CORREÇÃO 3: Carregar o HP REAL do novo pokemon, em vez de resetar para 100
+    setHpP1(novoPokeObj.hpAtual);
+    
+    carregarGolpes(novoPokeObj.nome);
+    
     setMenuFase('principal');
     setTurno('p1');
   };
 
+  // --- AÇÃO: JOGADOR ATACA ---
   const handleUsarGolpe = (golpe) => {
     setMenuFase('principal'); 
     const fatorSorte = (Math.floor(Math.random() * 15) + 85) / 100; 
     const danoFinal = Math.floor(golpe.poder * 0.5 * fatorSorte); 
+    
     setDialogo(`${p1.pokemons[activeP1Index].nome} usou ${golpe.nome.toUpperCase()}!`);
 
     setShowPlayerAttack(true); 
@@ -100,8 +158,8 @@ const Batalha = () => {
       setEnemyDamaged(true); 
       setEnemyFlash(true); 
 
-      const novoHpInimigo = Math.max(0, hpP2 - danoFinal);
-      setHpP2(novoHpInimigo);
+      // USA A NOVA FUNÇÃO DE DANO
+      const novoHpInimigo = aplicarDanoP2(danoFinal);
 
       setTimeout(() => {
           setEnemyDamaged(false);
@@ -117,14 +175,22 @@ const Batalha = () => {
     }, 800); 
   };
 
+  // --- LÓGICA: INIMIGO DESMAIOU ---
   const verificarVitoriaOuTrocaInimigo = () => {
     const pokemonMorto = p2.pokemons[activeP2Index].nome;
     setDialogo(`${pokemonMorto} desmaiou!`);
+
     setTimeout(() => {
+      // Procura o próximo pokemon vivo do inimigo
+      // (Lógica simples: pega o próximo da lista. Num jogo real, a IA escolheria)
       const proximoIndex = activeP2Index + 1;
+      
       if (proximoIndex < p2.pokemons.length) {
         setActiveP2Index(proximoIndex);
-        setHpP2(100);
+        
+        // Recupera HP do próximo inimigo (como inicializamos com 100, deve estar 100)
+        setHpP2(p2.pokemons[proximoIndex].hpAtual);
+        
         const novoPoke = p2.pokemons[proximoIndex].nome;
         setDialogo(`${p2.nome} enviou ${novoPoke}!`);
         setTurno('p1'); 
@@ -135,11 +201,15 @@ const Batalha = () => {
     }, 2000);
   };
 
+  // --- LÓGICA: PLAYER DESMAIOU ---
   const verificarDerrotaOuTrocaPlayer = () => {
     const pokemonMorto = p1.pokemons[activeP1Index].nome;
     setDialogo(`${pokemonMorto} desmaiou...`);
+
     setTimeout(() => {
-        const temPokemonVivo = p1.pokemons.length > 1; 
+        // Verifica se existe algum pokemon no time com HP > 0
+        const temPokemonVivo = p1.pokemons.some(p => p.hpAtual > 0);
+
         if (temPokemonVivo) {
             setDialogo("Escolha seu próximo Pokémon!");
             setMenuFase('troca'); 
@@ -150,17 +220,20 @@ const Batalha = () => {
     }, 2000);
   };
 
+  // --- AÇÃO: INIMIGO ATACA ---
   const contraAtaqueInimigo = () => {
     const danoInimigo = Math.floor(Math.random() * 25) + 10; 
     setDialogo(`${p2.pokemons[activeP2Index].nome} inimigo atacou!`);
+
     setShowEnemyAttack(true);
+
     setTimeout(() => {
       setShowEnemyAttack(false); 
       setPlayerDamaged(true); 
       setPlayerFlash(true); 
 
-      const novoHpPlayer = Math.max(0, hpP1 - danoInimigo);
-      setHpP1(novoHpPlayer);
+      // USA A NOVA FUNÇÃO DE DANO
+      const novoHpPlayer = aplicarDanoP1(danoInimigo);
       
       setTimeout(() => {
           setPlayerDamaged(false);
@@ -196,7 +269,6 @@ const Batalha = () => {
             src={activeP2.sprite} 
             alt="Enemy" 
             style={styles.enemySprite} 
-            // CORREÇÃO AQUI: Adicionamos 'idle-float' e a lógica de dano
             className={`idle-float ${enemyDamaged ? 'damaged-animation' : ''} ${enemyFlash ? 'flash-animation' : ''}`} 
         />
       </div>
@@ -232,17 +304,29 @@ const Batalha = () => {
         
         {menuFase === 'troca' ? (
             <div style={styles.movesGrid}>
-                {p1.pokemons.map((poke, idx) => (
-                    <button 
-                        key={idx} 
-                        className="btn-move" 
-                        disabled={idx === activeP1Index} 
-                        onClick={() => handleTrocarPokemon(idx)}
-                        style={{ backgroundColor: idx === activeP1Index ? '#555' : '#fff', color: idx === activeP1Index ? '#888' : '#000' }}
-                    >
-                        {poke.nome} {idx === activeP1Index && " (Fainted)"}
-                    </button>
-                ))}
+                {p1.pokemons.map((poke, idx) => {
+                    // Verifica se está morto baseado na propriedade hpAtual
+                    const isFainted = poke.hpAtual <= 0;
+                    const isActive = idx === activeP1Index;
+
+                    return (
+                        <button 
+                            key={idx} 
+                            className="btn-move" 
+                            disabled={isActive || isFainted} // Desabilita se for o atual OU se estiver morto
+                            onClick={() => handleTrocarPokemon(idx)}
+                            style={{
+                                backgroundColor: (isActive || isFainted) ? '#555' : '#fff',
+                                color: (isActive || isFainted) ? '#888' : '#000',
+                                cursor: (isActive || isFainted) ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            {poke.nome} 
+                            {isFainted && " (MORTO)"}
+                            {isActive && " (ATUAL)"}
+                        </button>
+                    );
+                })}
             </div>
         ) : (
             <>
@@ -287,14 +371,8 @@ const styles = {
   },
   enemyArea: { position: 'absolute', top: '120px', right: '60px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' },
   playerArea: { position: 'absolute', bottom: '180px', left: '60px', display: 'flex', alignItems: 'flex-end' },
-  
-  // REMOVIDO: A propriedade animation: 'float...' foi removida daqui para não dar conflito
-  enemySprite: { 
-    width: '280px', height: '280px', marginTop: '-20px', marginRight: '40px', 
-    filter: 'drop-shadow(5px 10px 10px rgba(0,0,0,0.5))' 
-  },
-  
-  heroSprite: { width: '380px', height: '380px', marginBottom: '-20px', marginLeft: '40px', filter: 'drop-shadow(20px 10px 10px rgba(0,0,0,0.5))' },
+  enemySprite: { width: '280px', height: '280px', marginTop: '-20px', marginRight: '40px', filter: 'drop-shadow(5px 10px 10px rgba(0,0,0,0.5))' },
+  heroSprite: { width: '380px', height: '380px', marginBottom: '-20px', marginLeft: '40px', filter: 'drop-shadow(5px 10px 10px rgba(0,0,0,0.5))' },
   hudBox: { backgroundColor: '#f8f8d8', border: '4px solid #333', padding: '10px 20px', borderRadius: '10px 0 10px 0', boxShadow: '6px 6px 0px rgba(0,0,0,0.3)', width: '280px', zIndex: 5 },
   nameText: { display: 'block', marginBottom: '8px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '16px', color: '#000' },
   hpContainer: { width: '100%', height: '12px', backgroundColor: '#555', borderRadius: '6px', border: '2px solid #222', overflow: 'hidden' },
