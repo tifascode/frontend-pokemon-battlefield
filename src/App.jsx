@@ -4,6 +4,7 @@ import Cadastro from './pages/Cadastro';
 import SelecaoTime from './pages/SelecaoTime';
 import Lobby from './pages/Lobby'; // <--- Importe o Lobby
 import Batalha from './pages/Batalha';
+
 // Pode remover MapaGinasios se quiser
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/cadastro" element={<Cadastro />} />
         <Route path="/selecao" element={<SelecaoTime />} />
+        <Route path="/batalha/:player1Id/:player2Id/:ginasioId" element={<Batalha />} />
         
         {/* Nova Rota Intermediária */}
         <Route path="/lobby" element={<Lobby />} />

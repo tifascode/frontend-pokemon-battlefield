@@ -1,7 +1,10 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000', // ALERTA: Mude para a URL do seu backend
+  baseURL: 'https://pokemon-battlefield.onrender.com',
+  headers: {
+    'Content-Type': 'application/json',
+  }
 });
 
 export default api;

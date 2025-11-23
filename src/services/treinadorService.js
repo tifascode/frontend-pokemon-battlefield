@@ -1,72 +1,24 @@
 import api from './api';
 
-const USAR_MOCK = true;
-
-// Função auxiliar para simular banco de dados no navegador
-const getMockDB = () => JSON.parse(localStorage.getItem('db_treinadores') || '[]');
-const setMockDB = (data) => localStorage.setItem('db_treinadores', JSON.stringify(data));
-
-// 1. Buscar Classes (sem alterações)
 export const getClasses = async () => {
-  if (USAR_MOCK) {
-    return { data: [{ nome: 'Iniciante' }, { nome: 'Líder de Ginásio' }, { nome: 'Elite Four' }] };
-  } else {
-    return await api.get('/classes'); 
-  }
+  const response = await api.get('/classes-treinadores');
+  // A API retorna um Map {"NOME": {bonus...}}, convertemos para Array
+  const classesArray = Object.entries(response.data).map(([key, value]) => ({
+    nome: key, 
+    ...value
+  }));
+  return { data: classesArray };
 };
 
-// 2. Cadastrar Treinador (Agora salva na lista)
-export const cadastrarTreinador = async (nome, classe) => {
-  if (USAR_MOCK) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const db = getMockDB();
-        const novoTreinador = {
-          id: Date.now(), // ID único baseado no tempo
-          nome,
-          classe,
-          pokemons: []
-        };
-        db.push(novoTreinador);
-        setMockDB(db);
-        
-        resolve({ data: novoTreinador });
-      }, 500);
-    });
-  } else {
-    return await api.post('/treinador', { nome, classe });
-  }
+export const cadastrarTreinador = async (nome, classeTreinador) => {
+  // A doc pede "classeTreinador" no body
+  return await api.post('/treinador', { nome, classeTreinador });
 };
 
-// 3. Salvar Time (Atualiza o treinador existente na lista)
-export const salvarTime = async (treinadorId, pokemons) => {
-  if (USAR_MOCK) {
-    return new Promise((resolve) => {
-      const db = getMockDB();
-      const index = db.findIndex(t => t.id == treinadorId);
-      
-      if (index !== -1) {
-        db[index].pokemons = pokemons.map(p => ({ 
-          nome: p.name, 
-          id: p.id, 
-          sprite: p.sprite, // Salvamos a url da imagem pra facilitar
-          hp: 100 // Já preparando para a batalha: Vida cheia!
-        }));
-        setMockDB(db);
-      }
-      resolve({ status: 200 });
-    });
-  } else {
-    const payload = { treinadorId, pokemons: pokemons.map(p => ({ nome: p.name, id: p.id })) };
-    return await api.post(`/treinador/${treinadorId}/pokemons`, payload);
-  }
-};
-
-// 4. NOVA FUNÇÃO: Listar todos os treinadores (Para o Lobby)
 export const listarTreinadores = async () => {
-  if (USAR_MOCK) {
-    return { data: getMockDB() };
-  } else {
-    return await api.get('/treinadores');
-  }
+  return await api.get('/treinador');
+};
+
+export const getTreinadorById = async (id) => {
+  return await api.get(`/treinador/${id}`);
 };

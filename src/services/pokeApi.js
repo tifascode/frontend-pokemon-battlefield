@@ -1,7 +1,14 @@
-import axios from 'axios';
+import api from './api';
 
-const pokeApi = axios.create({
-  baseURL: 'https://pokeapi.co/api/v2/',
-});
+export const listarPokemons = async () => {
+  const response = await api.get('/pokemon');
+  return response.data.result; // A doc diz que a lista está em "result"
+};
 
-export default pokeApi;
+export const capturarPokemon = async (idTreinador, idPokemon) => {
+  // A doc pede IDs como String no body
+  return await api.post('/pokemon', {
+    idTreinador: String(idTreinador),
+    idPokemon: String(idPokemon)
+  });
+};
